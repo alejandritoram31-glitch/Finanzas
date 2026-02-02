@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Finanzas Farmacia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="dark">
+
+<header>
+  <h1>Dashboard financiero</h1>
+</header>
+
+<main>
+
+  <!-- REGISTRO DIARIO -->
+  <div class="card">
+    <h2>Registro diario de ventas</h2>
+
+    <label>Día</label>
+    <select id="dia">
+      <option>Lunes</option>
+      <option>Martes</option>
+      <option>Miércoles</option>
+      <option>Jueves</option>
+      <option>Viernes</option>
+      <option>Sábado</option>
+      <option>Domingo</option>
+    </select>
+
+    <label>Monto vendido</label>
+    <input type="number" id="ventaDia" placeholder="Ej. 3500">
+
+    <button onclick="guardarVentaDiaria()">Guardar día</button>
+
+    <p id="totalSemana">Total semana: $0</p>
+    <button onclick="cerrarSemana()">Cerrar semana</button>
+  </div>
+
+  <!-- GASTOS -->
+  <div class="card">
+    <h2>Gastos semanales</h2>
+    <input type="number" id="gastos" placeholder="Total de gastos">
+  </div>
+
+  <!-- PORCENTAJES -->
+  <div class="card">
+    <h2>Distribución de utilidad</h2>
+
+    <label>% Ahorro</label>
+    <input type="number" id="pAhorro" value="30">
+
+    <label>% Reinversión</label>
+    <input type="number" id="pReinv" value="40">
+
+    <label>% Libre</label>
+    <input type="number" id="pLibre" value="30">
+
+    <button onclick="analizar()">Analizar semana</button>
+  </div>
+
+  <!-- RESUMEN -->
+  <div class="card">
+    <h2>Resumen financiero</h2>
+    <p id="resumen"></p>
+  </div>
+
+  <!-- PREDICCIÓN -->
+  <div class="card">
+    <h2>Predicción financiera</h2>
+    <p id="prediccionTexto">Sin datos suficientes</p>
+  </div>
+
+</main>
+
+<script>
+/* ===== VENTAS DIARIAS ===== */
+function guardarVentaDiaria(){
+  const dia = document.getElementById("dia").value;
+  const monto = Number(document.getElementById("ventaDia").value);
+  if(monto <= 0) return;
+
+  const semana = JSON.parse(localStorage.getItem("semana")) || [];
+  semana.push({dia, monto});
+  localStorage.setItem("semana", JSON.stringify(semana));
+  actualizarTotalSemana();
+}
+
+function actualizarTotalSemana(){
+  const semana = JSON.parse(localStorage.getItem("semana")) || [];
+  const total = semana.reduce((s,d)=>s+d.monto,0);
+  document.getElementById("totalSemana").innerText =
+    "Total semana: $" + total.toFixed(2);
+}
+
+function cerrarSemana(){
+  localStorage.removeItem("semana");
+  actualizarTotalSemana();
+}
+
+/* ===== ANALISIS ===== */
+function analizar(){
+  const semana = JSON.parse(localStorage.getItem("semana")) || [];
+  if(semana.length === 0) return;
+
+  const ingresos = semana.reduce((s,d)=>s+d.monto,0);
+  const gastos = Number(document.getElementById("gastos").value);
+
+  const utilidad = ingresos - gastos;
+  if(utilidad <= 0){
+    document.getElementById("resumen").innerText =
+      "No hay utilidad positiva en este periodo.";
+    return;
+  }
+
+  const pAhorro = Number(document.getElementById("pAhorro").value)/100;
+  const pReinv = Number(document.getElementById("pReinv").value)/100;
+  const pLibre = Number(document.getElementById("pLibre").value)/100;
+
+  const ahorro = utilidad * pAhorro;
+  const reinv = utilidad * pReinv;
+  const libre = utilidad * pLibre;
+
+  const registro = {
+    fecha: new Date().toISOString().slice(0,10),
+    ingresos,
+    gastos,
+    utilidad,
+    ahorro,
+    reinv,
+    libre
+  };
+
+  const registros = JSON.parse(localStorage.getItem("registros")) || [];
+  registros.push(registro);
+  localStorage.setItem("registros", JSON.stringify(registros));
+
+  document.getElementById("resumen").innerText = `
+Ingresos: $${ingresos.toFixed(2)}
+Gastos: $${gastos.toFixed(2)}
+Utilidad: $${utilidad.toFixed(2)}
+
+Ahorro: $${ahorro.toFixed(2)}
+Reinversión: $${reinv.toFixed(2)}
+Disponible: $${libre.toFixed(2)}
+`;
+
+  generarPrediccion();
+}
+
+/* ===== PREDICCIONES ===== */
+function generarPrediccion(){
+  const datos = JSON.parse(localStorage.getItem("registros")) || [];
+  if(datos.length < 2){
+    document.getElementById("prediccionTexto").innerText =
+      "Se requieren al menos dos semanas para proyección.";
+    return;
+  }
+
+  const ahorros = datos.map(d=>d.ahorro);
+  const promedio = ahorros.reduce((a,b)=>a+b,0)/ahorros.length;
+
+  const ultimo = ahorros.at(-1);
+  const anterior = ahorros.at(-2);
+
+  let tendencia = "estable";
+  if(ultimo > anterior) tendencia = "creciente";
+  if(ultimo < anterior) tendencia = "decreciente";
+
+  document.getElementById("prediccionTexto").innerText = `
+Promedio de ahorro semanal: $${promedio.toFixed(2)}
+
+Predicción a 1 mes:
+$${(promedio*4).toFixed(2)}
+
+Predicción a 3 meses:
+$${(promedio*12).toFixed(2)}
+
+Tendencia: ${tendencia}
+`;
+}
+
+actualizarTotalSemana();
+</script>
+
+</body>
+</html>
